@@ -1,10 +1,14 @@
 ﻿using System.Net;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 
 using Microsoft.Extensions.PlatformAbstractions;
 
 using SocketOf.ConfigCtx;
+
+[DllImport("libc", EntryPoint = "access", SetLastError = true)]
+static extern int Access(string path, int mode);
 
 [DllImport("libc", EntryPoint = "readlink", SetLastError = true)]
 static extern int ReadLink(string path, byte[] buf, int bufSize);
@@ -31,11 +35,6 @@ foreach (string directory in Directory.GetDirectories(ConfigCtx.Options.ProcDire
 
                 socketInodes[pid].Add(inode);
             }
-        }
-        catch (UnauthorizedAccessException ex) when (ex.Message.StartsWith("Access to the path"))
-        {
-            // Ignored like pidof does
-            continue;
         }
         catch (Exception ex)
         {
@@ -145,26 +144,28 @@ List<long> FindSocketInodes(string path)
 {
     List<long> inodes = new();
 
-    foreach (string fdLink in Directory.GetFiles(path))
-    {
-        byte[] buffer = new byte[4096];
+    if (Access(path, 4) == 0) {
+        foreach (string fdLink in Directory.GetFiles(path))
+        {
+            byte[] buffer = new byte[4096];
 
-        if (ReadLink(fdLink, buffer, buffer.Length) < 0) {
-            int errno = Marshal.GetLastPInvokeError();
+            if (ReadLink(fdLink, buffer, buffer.Length) < 0) {
+                int errno = Marshal.GetLastPInvokeError();
 
-            // Sometimes links go away on busy systems
-            if (errno != 2) {
-                throw new Exception($"Error ReadLink {fdLink}: {Marshal.GetLastPInvokeError()}");
-            }
-        } else {
-            string link = System.Text.Encoding.UTF8.GetString(buffer) ?? String.Empty;
+                // Sometimes links go away on busy systems
+                if (errno != 2) {
+                    throw new Exception($"Error ReadLink {fdLink}: {Marshal.GetLastPInvokeError()}");
+                }
+            } else {
+                string link = System.Text.Encoding.UTF8.GetString(buffer) ?? String.Empty;
 
-            if (link.StartsWith("socket:[") && link.EndsWith("]")) {
-                long inode = long.Parse(link
-                    .Replace("socket:[", String.Empty)
-                    .Replace("]", String.Empty));
+                if (link.StartsWith("socket:[") && link.EndsWith("]")) {
+                    long inode = long.Parse(link
+                        .Replace("socket:[", String.Empty)
+                        .Replace("]", String.Empty));
 
-                inodes.Add(inode);
+                    inodes.Add(inode);
+                }
             }
         }
     }
