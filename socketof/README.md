@@ -3,7 +3,8 @@
 socketof is a utility that works like pidof, except for sockets.  The pid of a
 process or processes using a socket based on a few filters is displayed.
 
-It's much simpler than other socket utilities such as ss and netstat.
+It's much simpler than other socket utilities such as ss and netstat.  And,
+will never have as many features.
 
 # Examples
 
