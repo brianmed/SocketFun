@@ -1,17 +1,9 @@
 ﻿using System.Net;
-using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
-using System.Security.AccessControl;
 
 using Microsoft.Extensions.PlatformAbstractions;
 
 using SocketOf.ConfigCtx;
-
-[DllImport("libc", EntryPoint = "access", SetLastError = true)]
-static extern int Access(string path, int mode);
-
-[DllImport("libc", EntryPoint = "readlink", SetLastError = true)]
-static extern int ReadLink(string path, byte[] buf, int bufSize);
 
 ConfigCtx.ParseOptions(args);
 
@@ -22,27 +14,38 @@ foreach (string directory in Directory.GetDirectories(ConfigCtx.Options.ProcDire
     string[] segments = directory
         .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
 
-    if (segments.Length == 2 && Int32.TryParse(segments.Last(), out int pid)) {
-        string fdPath = Path.Combine(directory, "fd");
+    if (segments.Length != 2 || Int32.TryParse(segments.Last(), out int pid) is false) {
+        continue;
+    }
 
-        try
+    string fdPath = Path.Combine(directory, "fd");
+
+    try
+    {
+        foreach (long inode in FindSocketInodes(fdPath))
         {
-            foreach (long inode in FindSocketInodes(fdPath))
-            {
-                if (socketInodes.ContainsKey(pid) is false) {
-                    socketInodes.Add(pid, new());
-                }
-
-                socketInodes[pid].Add(inode);
+            if (socketInodes.ContainsKey(pid) is false) {
+                socketInodes.Add(pid, new());
             }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"{PlatformServices.Default.Application.ApplicationName}: {ex.Message}");
 
-            continue;
+            socketInodes[pid].Add(inode);
         }
+    }
+    catch (UnauthorizedAccessException)
+    {
+        // Silenty continue, like pidof
+        continue;
+    }
+    catch (FileNotFoundException)
+    {
+        // Silenty continue, like pidof
+        continue;
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"{PlatformServices.Default.Application.ApplicationName}: {ex}");
 
+        continue;
     }
 }
 
@@ -51,6 +54,8 @@ foreach (KeyValuePair<int, HashSet<long>> pidInodes in socketInodes)
     PrintMatchingSocketAddresses(pidInodes.Key, pidInodes.Value, "tcp");
     PrintMatchingSocketAddresses(pidInodes.Key, pidInodes.Value, "tcp6");
 }
+
+Environment.Exit(ConfigCtx.Options.Quiet ? 1 : 0);
 
 void PrintMatchingSocketAddresses(int pid, HashSet<long> inodes, string networkType)
 {
@@ -63,72 +68,51 @@ void PrintMatchingSocketAddresses(int pid, HashSet<long> inodes, string networkT
         {
             string line = sr.ReadLine() ?? String.Empty;
 
-            string local_address = null;
-            string remote_address = null;
-            string inode = null;
+            ProcNetTcp procNetTcp = null;
 
             switch (networkType)
             {
                 case "tcp":
                 case "tcp6":
-                    string[] segments = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-                    (local_address, remote_address, inode) = segments switch
-                    {
-                        _ when segments.Length >= 11 && segments[11] == "inode" => (segments[1], segments[2], segments[11]),
-                        _ when segments.Length >= 11 && segments[11] != "inode" => (segments[1], segments[2], segments[9]),
-                        _ => throw new ArgumentException($"Unsupported Contents Found: {line} - {line.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length}")
-                    };
+                    procNetTcp = new ProcNetTcp(line);
 
                     break;
             }
 
-            if (inode == "inode") {
+            if (procNetTcp.IsHeader) {
                 continue;
-            } else if (inodes.Contains(long.Parse(inode))) {
-                bool? shouldPrintPid = null;
+            }
 
-                if (String.IsNullOrWhiteSpace(ConfigCtx.Options.SourceIp) is false) {
-                    IPAddress localAddress = new IPAddress(local_address
-                        .Split(":").First()
-                        .Chunk(8)
-                        .Select(v => String.Join("", new string(v))
-                            .Chunk(2).Reverse()
-                            .Select(v => Convert.ToByte(new string(v), 16)))
-                        .SelectMany(v => v).ToArray());
+            if (inodes.Contains(procNetTcp.Inode) is false) {
+                continue;
+            }
 
-		            IPAddress srcIp = IPAddress.Parse(ConfigCtx.Options.SourceIp);
+            bool? shouldPrintPid = null;
 
-                    shouldPrintPid = localAddress.Equals(srcIp);
-                }
+            if (String.IsNullOrWhiteSpace(ConfigCtx.Options.SourceIp) is false) {
+                IPAddress srcIp = IPAddress.Parse(ConfigCtx.Options.SourceIp);
 
-                if (String.IsNullOrWhiteSpace(ConfigCtx.Options.SourcePort) is false) {
-            		uint localPort = uint.Parse(local_address.Split(":").Last(), System.Globalization.NumberStyles.AllowHexSpecifier);
+                shouldPrintPid = procNetTcp.SrcAddress.Equals(srcIp);
+            }
 
-                    shouldPrintPid = localPort.Equals(uint.Parse(ConfigCtx.Options.SourcePort));
-                }
+            if (String.IsNullOrWhiteSpace(ConfigCtx.Options.SourcePort) is false) {
+                shouldPrintPid = procNetTcp.SrcPort.Equals(uint.Parse(ConfigCtx.Options.SourcePort));
+            }
 
-                if (String.IsNullOrWhiteSpace(ConfigCtx.Options.DestinationIp) is false) {
-                    IPAddress remoteAddress = new IPAddress(remote_address
-                        .Split(":").First()
-                        .Chunk(8)
-                        .Select(v => String.Join("", new string(v))
-                            .Chunk(2).Reverse()
-                            .Select(v => Convert.ToByte(new string(v), 16)))
-                        .SelectMany(v => v).ToArray());
+            if (String.IsNullOrWhiteSpace(ConfigCtx.Options.DestinationIp) is false) {
+                IPAddress dstIp = IPAddress.Parse(ConfigCtx.Options.DestinationIp);
 
-		            IPAddress dstIp = IPAddress.Parse(ConfigCtx.Options.DestinationIp);
+                shouldPrintPid = procNetTcp.DstAddress.Equals(dstIp);
+            }
 
-                    shouldPrintPid = remoteAddress.Equals(dstIp);
-                }
+            if (String.IsNullOrWhiteSpace(ConfigCtx.Options.DestinationPort) is false) {
+                shouldPrintPid = procNetTcp.DstPort.Equals(uint.Parse(ConfigCtx.Options.DestinationPort));
+            }
 
-                if (String.IsNullOrWhiteSpace(ConfigCtx.Options.DestinationPort) is false) {
-            		uint destinationPort = uint.Parse(remote_address.Split(":").Last(), System.Globalization.NumberStyles.AllowHexSpecifier);
-
-                    shouldPrintPid = destinationPort.Equals(uint.Parse(ConfigCtx.Options.DestinationPort));
-                }
-
-                if (shouldPrintPid.Value) {
+            if (shouldPrintPid.Value) {
+                if (ConfigCtx.Options.Quiet) {
+                    Environment.Exit(0);
+                } else {
                     Console.WriteLine(pid);
 
                     break;
@@ -138,35 +122,21 @@ void PrintMatchingSocketAddresses(int pid, HashSet<long> inodes, string networkT
     }
 }
 
-Environment.Exit(ConfigCtx.Options.Quiet ? 1 : 0);
-
 List<long> FindSocketInodes(string path)
 {
     List<long> inodes = new();
 
-    if (Access(path, 4) == 0) {
-        foreach (string fdLink in Directory.GetFiles(path))
-        {
-            byte[] buffer = new byte[4096];
+    foreach (string fdLink in Directory.GetFiles(path))
+    {
+        FileSystemInfo link = Directory
+            .ResolveLinkTarget(fdLink, returnFinalTarget: false);
 
-            if (ReadLink(fdLink, buffer, buffer.Length) < 0) {
-                int errno = Marshal.GetLastPInvokeError();
+        if (link.Name.StartsWith("socket:[") && link.Name.EndsWith("]")) {
+            long inode = long.Parse(link.Name
+                .Replace("socket:[", String.Empty)
+                    .Replace("]", String.Empty));
 
-                // Sometimes links go away on busy systems
-                if (errno != 2) {
-                    throw new Exception($"Error ReadLink {fdLink}: {Marshal.GetLastPInvokeError()}");
-                }
-            } else {
-                string link = System.Text.Encoding.UTF8.GetString(buffer) ?? String.Empty;
-
-                if (link.StartsWith("socket:[") && link.EndsWith("]")) {
-                    long inode = long.Parse(link
-                        .Replace("socket:[", String.Empty)
-                        .Replace("]", String.Empty));
-
-                    inodes.Add(inode);
-                }
-            }
+            inodes.Add(inode);
         }
     }
 
