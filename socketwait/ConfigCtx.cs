@@ -12,10 +12,12 @@ namespace SocketWait.ConfigCtx;
 public enum WaitForEvents
 {
     PingFail,
+    PingFlipFlop,
     PingSuccess,
-    TcpConnect,
-    TcpRegexResponse,
-    TcpSsh2Response
+    TcpConnectFail,
+    TcpConnectFlipFlop,
+    TcpConnectSuccess,
+    TcpRegexResponse
 }
 
 public class Options
@@ -118,6 +120,14 @@ public static class ConfigCtx
                     }
                     Environment.Exit(1);
                 }
+            }
+
+            if (ConfigCtx.Options.WaitFor == WaitForEvents.TcpRegexResponse) {
+                if (ConfigCtx.Options.TcpRegexResponse is null) {
+                    Console.Error.WriteLine("Please pass in a --tcpRegexResponse");
+                }
+            } else if (ConfigCtx.Options.TcpRegexResponse is not null) {
+                Console.Error.WriteLine("Please do not pass in a --tcpRegexResponse");
             }
         }
         catch (Exception e)

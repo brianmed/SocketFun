@@ -2,11 +2,13 @@
 
 IWaitFor waitFor = ConfigCtx.Options.WaitFor switch
 {
-    WaitForEvents.PingFail => new WaitForPingFail(),
-    WaitForEvents.PingSuccess => new WaitForPingSuccess(),
-    WaitForEvents.TcpConnect => new WaitForTcp(),
-    WaitForEvents.TcpRegexResponse => new WaitForTcp(),
-    WaitForEvents.TcpSsh2Response => new WaitForTcp()
+    WaitForEvents.PingFail => new WaitForPing(),
+    WaitForEvents.PingFlipFlop => new WaitForPing(),
+    WaitForEvents.PingSuccess => new WaitForPing(),
+    WaitForEvents.TcpConnectFail => new WaitForTcp(),
+    WaitForEvents.TcpConnectFlipFlop => new WaitForTcp(),
+    WaitForEvents.TcpConnectSuccess => new WaitForTcp(),
+    WaitForEvents.TcpRegexResponse => new WaitForTcp()
 };
 
 if (await waitFor.WaitForAsync()) {

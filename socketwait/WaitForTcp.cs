@@ -9,17 +9,58 @@ public class WaitForTcp : IWaitFor
     {
         TcpClientTimeout tcpClientTimeout = new();
 
-        foreach (int _ in Enumerable.Range(0, (int)ConfigCtx.Options.TcpRetries))
+        /*
+         * For Connecting
+         */
+        bool onlyWantConnect = ConfigCtx.Options.WaitFor switch
+        {
+            WaitForEvents.TcpConnectFail => true,
+            WaitForEvents.TcpConnectFlipFlop => true,
+            WaitForEvents.TcpConnectSuccess => true,
+            WaitForEvents.TcpRegexResponse => false
+        };
+
+        bool needAnotherConnect = ConfigCtx.Options.WaitFor == WaitForEvents.TcpConnectFlipFlop;
+
+        bool? wantConnectSuccess = ConfigCtx.Options.WaitFor switch
+        {
+            WaitForEvents.TcpConnectFail => false,
+            WaitForEvents.TcpConnectFlipFlop => null,
+            WaitForEvents.TcpConnectSuccess => true,
+            WaitForEvents.TcpRegexResponse => true
+        };
+
+        foreach (int retryIdx in Enumerable.Range(0, (int)ConfigCtx.Options.TcpRetries))
         {
             try
             {
+                if (retryIdx > 0) {
+                    await Task.Delay((int)ConfigCtx.Options.RetryTimeout);
+                }
+
                 using TcpClient tcpClient = await tcpClientTimeout.ConnectAsync(
                     ConfigCtx.Options.IpAddress,
                     (int)ConfigCtx.Options.Port, 
                     TimeSpan.FromMilliseconds(ConfigCtx.Options.TcpConnectTimeout));
 
-                if (ConfigCtx.Options.WaitFor == WaitForEvents.TcpConnect) {
-                    return true;
+                if (ConfigCtx.Options.WaitFor == WaitForEvents.TcpConnectFlipFlop) {
+                    if (needAnotherConnect) {
+                        needAnotherConnect = false;
+
+                        wantConnectSuccess = false;
+
+                        continue;
+                    }
+                }
+
+                if (onlyWantConnect) {
+                    bool shouldRetry = wantConnectSuccess is false;
+
+                    if (shouldRetry) {
+                        continue;
+                    }
+
+                    return wantConnectSuccess is true;
                 }
 
                 tcpClient.ReceiveTimeout = (int)ConfigCtx.Options.TcpReceiveTimeout;
@@ -45,36 +86,30 @@ public class WaitForTcp : IWaitFor
                 string output = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
                 if (output is null) {
-                    return false;
+                    throw new ArgumentNullException($"No output received from {ConfigCtx.Options.Host}:{ConfigCtx.Options.Port}");
                 }
 
-                string pattern = ConfigCtx.Options.WaitFor switch
-                {
-                    WaitForEvents.TcpSsh2Response => @"^SSH-2.0",
-                    WaitForEvents.TcpRegexResponse => ConfigCtx.Options.TcpRegexResponse
-                };
+                return Regex.IsMatch(output, ConfigCtx.Options.TcpRegexResponse);
+            }
+            catch (Exception ex)
+            {
+                if (ex is TcpTimeoutException || (ex is SocketException && ex.Message == "Connection refused")) {
+                    if (needAnotherConnect) {
+                        needAnotherConnect = false;
 
-                if (Regex.IsMatch(output, pattern)) {
-                    return true;
+                        wantConnectSuccess = true;
+                    } else if (onlyWantConnect) {
+                        bool shouldRetry = wantConnectSuccess is true;
+
+                        if (shouldRetry) {
+                            continue;
+                        }
+
+                        return wantConnectSuccess is false;
+                    }
                 } else {
-                    await Task.Delay((int)ConfigCtx.Options.RetryTimeout);
+                    throw;
                 }
-            }
-            catch (TcpTimeoutException ex)
-            {
-                await Task.Delay((int)ConfigCtx.Options.RetryTimeout);
-
-                continue;
-            }
-            catch (SocketException ex) when (ex.Message == "Connection refused")
-            {
-                await Task.Delay((int)ConfigCtx.Options.RetryTimeout);
-
-                continue;
-            }
-            catch (Exception)
-            {
-                throw;
             }
         }
 
