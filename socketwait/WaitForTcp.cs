@@ -93,7 +93,7 @@ public class WaitForTcp : IWaitFor
             }
             catch (Exception ex)
             {
-                if (ex is TcpTimeoutException || (ex is SocketException && ex.Message == "Connection refused")) {
+                if (ex is TcpTimeoutException || (ex is SocketException)) {
                     if (needAnotherConnect) {
                         needAnotherConnect = false;
 
