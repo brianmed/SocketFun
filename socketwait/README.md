@@ -2,6 +2,8 @@
 
 socketwait is a utility that will wait for a socket event and the exit.  An event can be PingFail, PingSuccess, TcpConnect, TcpRegexResponse, TcpSsh2Response.
 
+# Examples
+
 For example, if a script should wait for a server to be responsive than this would work:
 
 ```bash
