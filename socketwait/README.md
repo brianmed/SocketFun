@@ -19,6 +19,13 @@ $ echo "Ping did not receive a Success"
 Sometimes, waiting for a HTTP request to be responsive is needed:
 
 ```bash
-$ socketwait host port --waitFor TcpRegexResponse --tcpSendFirst "GET / HTTP/1.1\r\n" --tcpRegexResponse '(?i)title' --tcpRetries 300
+$ socketwait host 80 --waitFor TcpRegexResponse --tcpSendFirst "GET / HTTP/1.1\r\n" --tcpRegexResponse '(?i)title' --tcpRetries 300
 $ echo "HTTP response valid within 5 minutes"
+```
+
+Also, https is supported:
+
+```bash
+$ socketwait host 443 --waitFor TcpRegexResponse --tcpSendFirst "GET / HTTP/1.1\r\n" --tcpRegexResponse '(?i)TITLE' --tcpRetries 300 --tcpUseSslStream
+$ echo "HTTPS response valid within 5 minutes"
 ```
