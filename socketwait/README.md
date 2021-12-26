@@ -31,3 +31,26 @@ Also, https is supported:
 $ socketwait host 443 --waitFor TcpRegexResponse --tcpSendFirst "GET / HTTP/1.1\r\n" --tcpRegexResponse '(?i)TITLE' --tcpRetries 300 --tcpUseSslStream
 $ echo "HTTPS response valid within 5 minutes"
 ```
+
+Wait for SSH to start:
+
+```bash
+$ socketwait 192.168.62.133 22 --waitFor TcpRegexResponse --tcpRetries 30 --tcpRegexResponse '^SSH'
+$ echo "SSH is responsive"
+```
+
+Reboot a box, if needed, and wait for ssh:
+
+```bash
+#! /bin/bash
+
+ssh 192.168.62.133 test -e /var/run/reboot_required 
+
+if [ $? -eq 0 ]; then
+    ssh 192.168.62.133 sudo shutdown -r now
+    socketwait 192.168.62.133 --waitFor PingFail --pingRetries 30 
+    socketwait 192.168.62.133 22 --waitFor TcpRegexResponse --tcpRetries 30 --tcpRegexResponse '^SSH' 
+fi
+
+ssh 192.168.62.133 echo joy
+```
