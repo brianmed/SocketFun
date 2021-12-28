@@ -5,10 +5,10 @@ IWaitFor waitFor = ConfigCtx.Options.WaitFor switch
     WaitForEvents.PingFail => new WaitForPing(),
     WaitForEvents.PingFlipFlop => new WaitForPing(),
     WaitForEvents.PingSuccess => new WaitForPing(),
-    WaitForEvents.TcpConnectFail => new WaitForTcp(),
-    WaitForEvents.TcpConnectFlipFlop => new WaitForTcp(),
-    WaitForEvents.TcpConnectSuccess => new WaitForTcp(),
-    WaitForEvents.TcpRegexResponse => new WaitForTcp()
+    WaitForEvents.TcpConnectFail => new WaitForTcpConnect(),
+    WaitForEvents.TcpConnectFlipFlop => new WaitForTcpConnect(),
+    WaitForEvents.TcpConnectSuccess => new WaitForTcpConnect(),
+    WaitForEvents.TcpRegexResponse => new WaitForTcpRegexResponse()
 };
 
 if (await waitFor.WaitForAsync()) {

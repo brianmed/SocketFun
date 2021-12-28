@@ -17,12 +17,9 @@ public class TcpClientTimeout
         Task cancelTask = Task.Delay(connectTimeout);
         Task connectTask = tcpClient.ConnectAsync(ip, port);
 
-        //double await so if cancelTask throws exception, this throws it
-        await await Task.WhenAny(connectTask, cancelTask);
+        await Task.WhenAny(connectTask, cancelTask);
 
         if (cancelTask.IsCompleted && tcpClient.Connected is false) {
-            tcpClient.Dispose();
-
             throw new TcpTimeoutException("Timed out");
         } else {
             return tcpClient;

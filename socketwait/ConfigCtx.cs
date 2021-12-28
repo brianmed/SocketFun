@@ -34,8 +34,14 @@ public class Options
     [Option("waitFor", Required = true, HelpText = "Event Type to Wait for.")]
     public WaitForEvents WaitFor { get; internal set; }
 
-    [Option("tcpRetries", Required = false, HelpText = "TCP Connect Retries, Default is Int32.MaxValue")]
-    public uint TcpRetries { get; internal set; } = Int32.MaxValue;
+    [Option("pingTimeout", Required = false, HelpText = "Ping Timeout in Milliseconds, Default is 1,000")]
+    public int PingTimeout { get; internal set; } = 1_000;
+
+    [Option("retries", Required = false, HelpText = "Retry Attempts, Default is Int32.MaxValue")]
+    public uint Retries { get; internal set; } = Int32.MaxValue;
+
+    [Option("retryTimeout", Required = false, HelpText = "Retry Timeout in Milliseconds, Default is 1,000")]
+    public uint RetryTimeout { get; internal set; } = 1_000;
 
     [Option("tcpConnectTimeout", Required = false, HelpText = "TCP Connect Timeout in Milliseconds, Default is 1,000")]
     public uint TcpConnectTimeout { get; internal set; } = 1_000;
@@ -54,15 +60,6 @@ public class Options
 
     [Option("tcpUseSslStream", Required = false, HelpText = "Use SslStream (good for https)")]
     public bool TcpUseSslStream { get; internal set; }
-
-    [Option("pingRetries", Required = false, HelpText = "Ping Retries, Default is Int32.MaxValue")]
-    public uint PingRetries { get; internal set; } = Int32.MaxValue;
-
-    [Option("pingTimeout", Required = false, HelpText = "Ping Timeout in Milliseconds, Default is 1,000")]
-    public int PingTimeout { get; internal set; } = 1_000;
-
-    [Option("retryTimeout", Required = false, HelpText = "Global Retry Timeout in Milliseconds, Default is 1,000")]
-    public uint RetryTimeout { get; internal set; } = 1_000;
 
     [Option("version", Required = false, HelpText = "Version Information")]
     public bool Version { get; internal set; }
@@ -173,7 +170,7 @@ public static class ConfigCtx
 
             helpText.OptionComparison = HelpText.RequiredThenAlphaComparison;
 
-            Console.WriteLine($"{PlatformServices.Default.Application.ApplicationName} [host] [port]" + helpText);
+            Console.WriteLine($"{PlatformServices.Default.Application.ApplicationName} [host] [port] [options]" + helpText);
         }
 
         Environment.Exit(1);
