@@ -32,11 +32,18 @@ $ socketwait host 443 --waitFor TcpRegexResponse --tcpSendFirst "GET / HTTP/1.1\
 $ echo "HTTPS response valid within 5 minutes"
 ```
 
-Wait for SSH to start:
+Wait for SSH to respond:
 
 ```bash
 $ socketwait 192.168.62.133 22 --waitFor TcpRegexResponse --tcpRetries 30 --tcpRegexResponse '^SSH'
 $ echo "SSH is responsive"
+```
+
+Wait for Dovecot IMAP to respond:
+
+```bash
+$ socketwait 192.168.62.133 143 --waitFor TcpRegexResponse --tcpRegexResponse 'Dovecot' --retries 5 
+$ echo "Dovecot IMPAP is responsive"
 ```
 
 Reboot a box, if needed, and wait for ssh:
