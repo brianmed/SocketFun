@@ -1,62 +1,27 @@
 using System.Net.Sockets;
 
-using Polly;
-
 public class WaitForTcpConnect : IWaitFor
 {
-    async public Task<bool> WaitForAsync()
+    public List<Type> HandledExceptions { get; set; } = new()
     {
-        bool? wantSuccess = ConfigCtx.Options.WaitFor switch
-        {
-            WaitForEvents.TcpConnectFail => false,
-            WaitForEvents.TcpConnectFlipFlop => null,
-            WaitForEvents.TcpConnectSuccess => true,
-        };
+        typeof(TaskCanceledException),
+        typeof(TcpTimeoutException),
+        typeof(SocketException)
+    };
 
-        var policyResult = await Policy<bool>
-            .Handle<Exception>(ex =>
-            {
-                if (ex is TcpTimeoutException || (ex is SocketException)) {
-                    if (wantSuccess is null) {
-                        // Assume these are connect failures for FlipFlop
-                        wantSuccess = true;
-                    }
+    public string LogContextPrefix { get; set; } = nameof(WaitForTcpConnect);
 
-                    // Console.WriteLine($"{ex?.InnerException?.Message ?? ex.Message} - {wantSuccess}");
+    public ExpectedResult ExpectedResult { get; set; }
 
-                    return wantSuccess is true;
-                } else {
-                    throw ex;
-                }
-            })
-            .OrResult(connected =>
-            {
-                if (wantSuccess is null) {
-                    // Setup for round-trip of FlipFlop
-                    wantSuccess = !connected;
-                }
+    async public Task<bool> RunAsync()
+    {
+        TcpClientTimeout tcpClientTimeout = new();
 
-                return (connected is true && wantSuccess is false) ||
-                    (connected is false && wantSuccess is true);
-            })
-            .WaitAndRetryAsync((int)ConfigCtx.Options.Retries, _ => TimeSpan.FromMilliseconds(ConfigCtx.Options.RetryTimeout), (result, timeSpan, retryCount, context) =>
-            {
-                // Console.WriteLine($"Request failed with {result.Result}. Waiting {timeSpan} before next retry. Retry attempt {retryCount}");
-            })
-            .ExecuteAndCaptureAsync(async () =>
-            {
-                TcpClientTimeout tcpClientTimeout = new();
+        using TcpClient tcpClient = await tcpClientTimeout.ConnectAsync(
+            ConfigCtx.Options.IpAddress,
+            (int)ConfigCtx.Options.Port, 
+            TimeSpan.FromMilliseconds(ConfigCtx.Options.TcpConnectTimeout));
 
-                using TcpClient tcpClient = await tcpClientTimeout.ConnectAsync(
-                    ConfigCtx.Options.IpAddress,
-                    (int)ConfigCtx.Options.Port, 
-                    TimeSpan.FromMilliseconds(ConfigCtx.Options.TcpConnectTimeout));
-
-                return tcpClient?.Connected ?? false;
-            });
-
-        return (wantSuccess is true) ?
-            (policyResult.Result == true) :
-            (policyResult.Result == false);
+        return tcpClient?.Connected ?? false;
     }
 }

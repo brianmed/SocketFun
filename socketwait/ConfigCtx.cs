@@ -6,6 +6,7 @@ using Microsoft.Extensions.PlatformAbstractions;
 using CommandLine;
 using CommandLine.Text;
 using Mapster;
+using Serilog.Events;
 
 namespace SocketWait.ConfigCtx;
 
@@ -60,6 +61,9 @@ public class Options
 
     [Option("tcpUseSslStream", Required = false, HelpText = "Use SslStream (good for https)")]
     public bool TcpUseSslStream { get; internal set; }
+
+    [Option("logEventLevel", Required = false, HelpText = "Minimum Logging Level.")]
+    public LogEventLevel LoggingLevel { get; internal set; } = LogEventLevel.Information;
 
     [Option("version", Required = false, HelpText = "Version Information")]
     public bool Version { get; internal set; }
@@ -141,7 +145,7 @@ public static class ConfigCtx
         if (errors.Any(e => e.Tag == ErrorType.VersionRequestedError))
         {
             Console.WriteLine($"{nameof(SocketWait).ToLower()} Copyright (C) 2021 Brian Medley");
-            Console.WriteLine($"Version: 1");
+            Console.WriteLine($"Version: 0.0.3");
             Console.WriteLine($"https://github.com/brianmed/SocketFun");
         }
         else
