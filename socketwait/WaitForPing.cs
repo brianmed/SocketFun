@@ -1,20 +1,21 @@
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
-public class WaitForPing : IWaitFor
+public class WaitForPing : WaitFor
 {
-    public List<Type> HandledExceptions { get; set; } = new()
+    public WaitForPing(ExitStatusZeroWhen exitStatusZeroWhen) : base(exitStatusZeroWhen)
     {
-        typeof(PingException),
-        typeof(SocketException),
-        typeof(TaskCanceledException)
-    };
+        HandledExceptions = new()
+        {
+            typeof(PingException),
+            typeof(SocketException),
+            typeof(TaskCanceledException)
+        };
 
-    public string LogContextPrefix { get; set; } = nameof(WaitForPing);
+        LogPrefix = nameof(WaitForPing);
+    }
 
-    public ExpectedResult ExpectedResult { get; set; }
-
-    async public Task<bool> RunAsync()
+    protected override async Task<bool> RunAsync()
     {
         PingSender pingSender = new PingSender();
 

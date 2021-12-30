@@ -3,20 +3,21 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 
-public class WaitForTcpRegexResponse : IWaitFor
+public class WaitForTcpRegexResponse : WaitFor
 {
-    public List<Type> HandledExceptions { get; set; } = new()
+    public WaitForTcpRegexResponse(ExitStatusZeroWhen exitStatusZeroWhen) : base(exitStatusZeroWhen)
     {
-        typeof(TaskCanceledException),
-        typeof(TcpTimeoutException),
-        typeof(SocketException)
-    };
+        HandledExceptions = new()
+        {
+            typeof(TaskCanceledException),
+            typeof(TcpTimeoutException),
+            typeof(SocketException)
+        };
 
-    public string LogContextPrefix { get; set; } = nameof(WaitForTcpRegexResponse);
+        LogPrefix = nameof(WaitForTcpRegexResponse);
+    }
 
-    public ExpectedResult ExpectedResult { get; set; }
-
-    async public Task<bool> RunAsync()
+    protected override async Task<bool> RunAsync()
     {
         TcpClientTimeout tcpClientTimeout = new();
 

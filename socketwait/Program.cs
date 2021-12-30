@@ -14,18 +14,18 @@ Log.Logger = new LoggerConfiguration()
         "[{Timestamp:HH:mm:ss} {Level:u3}] {Prefix} {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
 
-IWaitFor waitFor = ConfigCtx.Options.WaitFor switch
+WaitFor waitFor = ConfigCtx.Options.WaitFor switch
 {
-    WaitForEvents.PingFail => new WaitForPing() { ExpectedResult = ExpectedResult.Failure },
-    WaitForEvents.PingFlipFlop => new WaitForPing() { ExpectedResult = ExpectedResult.FlipFlop },
-    WaitForEvents.PingSuccess => new WaitForPing() { ExpectedResult = ExpectedResult.Success },
-    WaitForEvents.TcpConnectFail => new WaitForTcpConnect() { ExpectedResult = ExpectedResult.Failure },
-    WaitForEvents.TcpConnectFlipFlop => new WaitForTcpConnect() { ExpectedResult = ExpectedResult.FlipFlop },
-    WaitForEvents.TcpConnectSuccess => new WaitForTcpConnect() { ExpectedResult = ExpectedResult.Success },
-    WaitForEvents.TcpRegexResponse => new WaitForTcpRegexResponse() { ExpectedResult = ExpectedResult.Success }
+    WaitForEvents.PingFail => new WaitForPing(ExitStatusZeroWhen.Failure),
+    WaitForEvents.PingFlipFlop => new WaitForPing(ExitStatusZeroWhen.FlipFlop),
+    WaitForEvents.PingSuccess => new WaitForPing(ExitStatusZeroWhen.Success),
+    WaitForEvents.TcpConnectFail => new WaitForTcpConnect(ExitStatusZeroWhen.Failure),
+    WaitForEvents.TcpConnectFlipFlop => new WaitForTcpConnect(ExitStatusZeroWhen.FlipFlop),
+    WaitForEvents.TcpConnectSuccess => new WaitForTcpConnect(ExitStatusZeroWhen.Success),
+    WaitForEvents.TcpRegexResponse => new WaitForTcpRegexResponse(ExitStatusZeroWhen.Success)
 };
 
-if (await waitFor.WaitForAsync()) {
+if (await waitFor.IsExitStatusZeroAsync()) {
     Environment.Exit(0);
 } else {
     Environment.Exit(1);

@@ -1,19 +1,20 @@
 using System.Net.Sockets;
 
-public class WaitForTcpConnect : IWaitFor
+public class WaitForTcpConnect : WaitFor
 {
-    public List<Type> HandledExceptions { get; set; } = new()
+    public WaitForTcpConnect(ExitStatusZeroWhen exitStatusZeroWhen) : base(exitStatusZeroWhen)
     {
-        typeof(TaskCanceledException),
-        typeof(TcpTimeoutException),
-        typeof(SocketException)
-    };
+        HandledExceptions = new()
+        {
+            typeof(TaskCanceledException),
+            typeof(TcpTimeoutException),
+            typeof(SocketException)
+        };
 
-    public string LogContextPrefix { get; set; } = nameof(WaitForTcpConnect);
+        LogPrefix = nameof(WaitForTcpConnect);
+    }
 
-    public ExpectedResult ExpectedResult { get; set; }
-
-    async public Task<bool> RunAsync()
+    protected override async Task<bool> RunAsync()
     {
         TcpClientTimeout tcpClientTimeout = new();
 
