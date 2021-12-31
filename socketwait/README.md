@@ -1,6 +1,8 @@
 # Summary
 
-socketwait is a utility that will wait for a socket event and the exit.  An event can be PingFail, PingSuccess, TcpConnect, TcpRegexResponse, TcpSsh2Response.
+socketwait is a utility that will wait for a socket event and the exit.  An event can be a ping failure, ping flip flop, ping success, tcp connect failure, tcp connect flip flop, tcp connect success, and tcp regex response.  The flip flops are when the utility gets an initial condition (either a success or failure) and then waits for the opposite.
+
+A flip flop is believed useful when a box is running and then a shutdown command is issued.  The flop flop will wait until ping is non-responsive before exiting.
 
 # Examples
 
