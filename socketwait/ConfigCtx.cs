@@ -3,9 +3,7 @@ using System.Net.Sockets;
 
 using Microsoft.Extensions.PlatformAbstractions;
 
-using CommandLine;
-using CommandLine.Text;
-using Mapster;
+using Mono.Options;
 using Serilog.Events;
 
 namespace SocketWait.ConfigCtx;
@@ -23,49 +21,34 @@ public enum WaitForEvents
 
 public class Options
 {
-    [AdaptIgnore]
     public IPAddress IpAddress { get; internal set; }
 
-    [AdaptIgnore]
     public string Host { get; internal set; }
 
-    [AdaptIgnore]
     public uint Port { get; internal set; }
 
-    [Option("waitFor", Required = true, HelpText = "Event Type to Wait for.")]
     public WaitForEvents WaitFor { get; internal set; }
 
-    [Option("pingTimeout", Required = false, HelpText = "Ping Timeout in Milliseconds, Default is 1,000")]
     public int PingTimeout { get; internal set; } = 1_000;
 
-    [Option("retries", Required = false, HelpText = "Retry Attempts, Default is Int32.MaxValue")]
-    public uint Retries { get; internal set; } = Int32.MaxValue;
+    public int Retries { get; internal set; } = Int32.MaxValue;
 
-    [Option("retryTimeout", Required = false, HelpText = "Retry Timeout in Milliseconds, Default is 1,000")]
     public uint RetryTimeout { get; internal set; } = 1_000;
 
-    [Option("tcpConnectTimeout", Required = false, HelpText = "TCP Connect Timeout in Milliseconds, Default is 1,000")]
     public uint TcpConnectTimeout { get; internal set; } = 1_000;
 
-    [Option("tcpReceiveTimeout", Required = false, HelpText = "TCP Receive Timeout in Milliseconds, Default is 1,000")]
     public uint TcpReceiveTimeout { get; internal set; } = 1_000;
 
-    [Option("tcpSendTimeout", Required = false, HelpText = "TCP Send Timeout in Milliseconds, Default is 1,000")]
     public uint TcpSendTimeout { get; internal set; } = 1_000;
 
-    [Option("tcpRegexResponse", Required = false, HelpText = "Regex that TcpRegexResponse Event Type Waits for")]
     public string TcpRegexResponse { get; internal set; }
 
-    [Option("tcpSendFirst", Required = false, HelpText = "Single String Will be Sent Before a Response")]
     public string TcpSendFirst { get; internal set; }
 
-    [Option("tcpUseSslStream", Required = false, HelpText = "Use SslStream (good for https)")]
     public bool TcpUseSslStream { get; internal set; }
 
-    [Option("logEventLevel", Required = false, HelpText = "Minimum Logging Level.")]
     public LogEventLevel LoggingLevel { get; internal set; } = LogEventLevel.Error;
 
-    [Option("version", Required = false, HelpText = "Version Information")]
     public bool Version { get; internal set; }
 }
 
@@ -77,28 +60,76 @@ public static class ConfigCtx
     {
         try
         {
-            Parser parser = new Parser(with => with.HelpWriter = null);
-            ParserResult<Options> result = parser.ParseArguments<Options>(
-                args.SkipWhile(v => v.Trim().StartsWith('-') is false));
+            bool showHelp = false;
+            bool showVersion = false;
 
-            result
-                .WithParsed<Options>(options =>
-                {
-                    ConfigCtx.Options = options.Adapt<Options>();
-                })
-                .WithNotParsed(errors => DisplayHelp(result, errors));
+            ConfigCtx.Options = new();
+
+            OptionSet optionSet = new()
+            {
+                $"Usage: {nameof(SocketWait).ToLower()} host port [OPTIONS]",
+                "Wait for a socket event and then exit",
+                "",
+                "Options:",
+                { "wait-for=", "Event Type to Wait for", (WaitForEvents v) => ConfigCtx.Options.WaitFor = v },
+                { "ping-timeout=", "Ping Timeout in Milliseconds [default: 1000]", (string v) => ConfigCtx.Options.PingTimeout = Int32.Parse(v) },
+                { "retries=", "Retry Attempts [default: Int32.MaxValue]", (string v) => ConfigCtx.Options.Retries = Int32.Parse(v) },
+                { "retry-timeout=", "Retry Timeout in Milliseconds [default: 1000]", (string v) => ConfigCtx.Options.RetryTimeout = UInt32.Parse(v) },
+                { "tcp-connect-timeout=", "TCP Connect Timeout in Milliseconds [default: 1000]", (string v) => ConfigCtx.Options.TcpConnectTimeout = UInt32.Parse(v) },
+                { "tcp-receive-timeout=", "TCP Receive Timeout in Milliseconds [default: 1000]", (string v) => ConfigCtx.Options.TcpReceiveTimeout = UInt32.Parse(v) },
+                { "tcp-send-timeout=", "TCP Send Timeout in Milliseconds [default: 1000]", (string v) => ConfigCtx.Options.TcpSendTimeout = UInt32.Parse(v) },
+                { "tcp-regex-response=", "Regex that TcpRegexResponse Event Type Waits for", (string v) => ConfigCtx.Options.TcpRegexResponse = v },
+                { "tcp-send-first=", "Single String Will be Sent Before a Response", (string v) => ConfigCtx.Options.TcpSendFirst = v },
+                { "tcp-use-ssl-stream", "Use SslStream (good for https)", (string v) => ConfigCtx.Options.TcpUseSslStream = v != null },
+                { "log-event-level", "Minimum Logging Level", (LogEventLevel v) => ConfigCtx.Options.LoggingLevel = v },
+                { "version",  "Version Information", v => showVersion = v != null },
+                { "help",  "Show this Message and Exit", v => showHelp = v != null }
+            };
+
+            try
+            {
+                optionSet.Parse(args);
+            }
+            catch (OptionException e)
+            {
+                Console.Write($"{nameof(SocketWait).ToLower()}: ");
+                Console.WriteLine(e.Message);
+                Console.WriteLine($"Try '{nameof(SocketWait).ToLower()} --help' for more information.");
+
+                return;
+            }
+
+            if (showHelp)
+            {
+                optionSet.WriteOptionDescriptions(Console.Out);
+
+                Environment.Exit(0);
+            }
+
+            if (showVersion)
+            {
+                Console.WriteLine($"{nameof(SocketWait).ToLower()} Copyright (C) 2024 Brian Medley");
+                Console.WriteLine($"Version: 0.0.5");
+                Console.WriteLine($"https://github.com/brianmed/SocketFun");
+
+                Environment.Exit(0);
+            }
 
             string host = args.FirstOrDefault() ?? String.Empty;
             string port = args.Skip(1).FirstOrDefault() ?? String.Empty;
 
             ConfigCtx.Options.Host = host;
 
-            if (IPAddress.TryParse(host, out IPAddress ipAddress)) {
+            if (IPAddress.TryParse(host, out IPAddress ipAddress))
+            {
                 ConfigCtx.Options.IpAddress = ipAddress;
-            } else {
+            }
+            else
+            {
                 try
                 {
-                    if (Dns.GetHostEntry(host, AddressFamily.InterNetwork) is IPHostEntry ipHostEntry && ipHostEntry.AddressList.Any()) {
+                    if (Dns.GetHostEntry(host, AddressFamily.InterNetwork) is IPHostEntry ipHostEntry && ipHostEntry.AddressList.Any())
+                    {
                         ConfigCtx.Options.IpAddress = ipHostEntry.AddressList.First();
                     }
                 }
@@ -110,25 +141,37 @@ public static class ConfigCtx
                 }
             }
 
-            if (ConfigCtx.Options.WaitFor.ToString().StartsWith("Tcp")) {
-                if (UInt32.TryParse(port, out UInt32 p)) {
+            if (ConfigCtx.Options.WaitFor.ToString().StartsWith("Tcp"))
+            {
+                if (UInt32.TryParse(port, out UInt32 p))
+                {
                     ConfigCtx.Options.Port = p;
-                } else {
-                    if (String.IsNullOrWhiteSpace(port)) {
+                }
+                else
+                {
+                    if (String.IsNullOrWhiteSpace(port))
+                    {
                         Console.Error.WriteLine("Please Pass in a Port");
-                    } else {
+                    }
+                    else
+                    {
                         Console.Error.WriteLine("Unable to Parse Port");
                     }
+
                     Environment.Exit(1);
                 }
             }
 
-            if (ConfigCtx.Options.WaitFor == WaitForEvents.TcpRegexResponse) {
-                if (ConfigCtx.Options.TcpRegexResponse is null) {
-                    Console.Error.WriteLine("Please pass in a --tcpRegexResponse");
+            if (ConfigCtx.Options.WaitFor == WaitForEvents.TcpRegexResponse)
+            {
+                if (ConfigCtx.Options.TcpRegexResponse is null)
+                {
+                    Console.Error.WriteLine("Please pass in a --tcp-regex-response");
                 }
-            } else if (ConfigCtx.Options.TcpRegexResponse is not null) {
-                Console.Error.WriteLine("Please do not pass in a --tcpRegexResponse");
+            }
+            else if (ConfigCtx.Options.TcpRegexResponse is not null)
+            {
+                Console.Error.WriteLine("Please do not pass in a --tcp-regex-response");
             }
         }
         catch (Exception e)
@@ -138,47 +181,5 @@ public static class ConfigCtx
 
             Environment.Exit(1);
         }   
-    }
-
-    static int DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errors)
-    {
-        if (errors.Any(e => e.Tag == ErrorType.VersionRequestedError))
-        {
-            Console.WriteLine($"{nameof(SocketWait).ToLower()} Copyright (C) 2021 Brian Medley");
-            Console.WriteLine($"Version: 0.0.4");
-            Console.WriteLine($"https://github.com/brianmed/SocketFun");
-        }
-        else
-        {
-            HelpText helpText = HelpText.AutoBuild(result, h =>
-                {
-                    // h.Copyright = $"{nameof(SocketWait).ToLower()} Copyright (C) 2021 Brian Medley";
-
-                    h.Copyright = String.Empty;
-
-                    h.AutoVersion = false;
-
-                    h.Heading = String.Empty;
-
-                    h.AddDashesToOption = true;
-
-                    h.AddEnumValuesToHelpText = true;
-
-                    return HelpText.DefaultParsingErrorsHandler(result, h);
-                },
-                e =>
-                {
-                    return e;
-                },
-                verbsIndex: true);
-
-            helpText.OptionComparison = HelpText.RequiredThenAlphaComparison;
-
-            Console.WriteLine($"{PlatformServices.Default.Application.ApplicationName} [host] [port] [options]" + helpText);
-        }
-
-        Environment.Exit(1);
-
-        return 1;
     }
 }
