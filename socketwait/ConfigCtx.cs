@@ -99,18 +99,18 @@ public static class ConfigCtx
                 return;
             }
 
-            if (showHelp)
+            if (showVersion)
             {
-                optionSet.WriteOptionDescriptions(Console.Out);
+                Console.WriteLine($"{nameof(SocketWait).ToLower()} Copyright (C) 2024 Brian Medley");
+                Console.WriteLine($"Version: 0.0.6");
+                Console.WriteLine($"https://github.com/brianmed/SocketFun");
 
                 Environment.Exit(0);
             }
 
-            if (showVersion)
+            if (showHelp || args.Length <= 2)
             {
-                Console.WriteLine($"{nameof(SocketWait).ToLower()} Copyright (C) 2024 Brian Medley");
-                Console.WriteLine($"Version: 0.0.5");
-                Console.WriteLine($"https://github.com/brianmed/SocketFun");
+                optionSet.WriteOptionDescriptions(Console.Out);
 
                 Environment.Exit(0);
             }
