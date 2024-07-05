@@ -19,9 +19,12 @@ public class TcpClientTimeout
 
         await Task.WhenAny(connectTask, cancelTask);
 
-        if (cancelTask.IsCompleted && tcpClient.Connected is false) {
+        if (cancelTask.IsCompleted && tcpClient.Connected is false)
+        {
             throw new TcpTimeoutException("Timed out");
-        } else {
+        }
+        else
+        {
             return tcpClient;
         }
     }

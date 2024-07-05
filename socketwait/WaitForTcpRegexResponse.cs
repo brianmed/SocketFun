@@ -31,15 +31,19 @@ public class WaitForTcpRegexResponse : WaitFor
 
         Stream stream = null;
 
-        if (ConfigCtx.Options.TcpUseSslStream) {
+        if (ConfigCtx.Options.TcpUseSslStream)
+        {
             stream = new SslStream(tcpClient.GetStream(), false);
 
             await ((SslStream)stream).AuthenticateAsClientAsync(ConfigCtx.Options.Host);
-        } else {
+        }
+        else
+        {
             stream = tcpClient.GetStream();
         }
 
-        if (ConfigCtx.Options.TcpSendFirst is not null) {
+        if (ConfigCtx.Options.TcpSendFirst is not null)
+        {
             await stream.WriteAsync(Encoding.UTF8.GetBytes(ConfigCtx.Options.TcpSendFirst));
         }
 
@@ -48,7 +52,8 @@ public class WaitForTcpRegexResponse : WaitFor
 
         string output = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
-        if (output is null) {
+        if (output is null)
+        {
             throw new ArgumentNullException($"No output received from {ConfigCtx.Options.Host}:{ConfigCtx.Options.Port}");
         }
 

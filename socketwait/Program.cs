@@ -25,8 +25,11 @@ WaitFor waitFor = ConfigCtx.Options.WaitFor switch
     WaitForEvents.TcpRegexResponse => new WaitForTcpRegexResponse(ExitStatusZeroWhen.Success)
 };
 
-if (await waitFor.IsExitStatusZeroAsync()) {
+if (await waitFor.IsExitStatusZeroAsync())
+{
     Environment.Exit(0);
-} else {
+}
+else
+{
     Environment.Exit(1);
 }

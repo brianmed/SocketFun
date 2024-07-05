@@ -64,11 +64,16 @@ public abstract class WaitFor
 
         HashSet<bool> allowedSuccessfulInput = new();
 
-        if (ExitStatusZeroWhen == ExitStatusZeroWhen.Success) {
+        if (ExitStatusZeroWhen == ExitStatusZeroWhen.Success)
+        {
             allowedSuccessfulInput.Add(true);
-        } else if (ExitStatusZeroWhen == ExitStatusZeroWhen.Failure) {
+        }
+        else if (ExitStatusZeroWhen == ExitStatusZeroWhen.Failure)
+        {
             allowedSuccessfulInput.Add(false);
-        } else if (ExitStatusZeroWhen == ExitStatusZeroWhen.FlipFlop) {
+        }
+        else if (ExitStatusZeroWhen == ExitStatusZeroWhen.FlipFlop)
+        {
             allowedSuccessfulInput.Add(true);
             allowedSuccessfulInput.Add(false);
         }
@@ -78,14 +83,14 @@ public abstract class WaitFor
 
     private async Task<PolicyResult<bool>> RunFlipFlopAsync(bool desiredInput)
     {
-            HashSet<bool> allowedSuccessfulInput = new();
+        HashSet<bool> allowedSuccessfulInput = new();
 
-            allowedSuccessfulInput.Clear();
-            allowedSuccessfulInput.Add(desiredInput);
+        allowedSuccessfulInput.Clear();
+        allowedSuccessfulInput.Add(desiredInput);
 
-            return await RunPolicyAsync((int)ConfigCtx.Options.Retries, allowedSuccessfulInput);
+        return await RunPolicyAsync((int)ConfigCtx.Options.Retries, allowedSuccessfulInput);
     }
-        
+
     private async Task<PolicyResult<bool>> RunPolicyAsync(int retries, HashSet<bool> allowedSuccessfulInput)
     {
         return await Policy<bool>
@@ -98,7 +103,8 @@ public abstract class WaitFor
             {
                 string exceptionMessage = (result.Exception?.InnerException?.Message ?? result.Exception?.Message ?? String.Empty);
 
-                if (String.IsNullOrWhiteSpace(exceptionMessage) is false) {
+                if (String.IsNullOrWhiteSpace(exceptionMessage) is false)
+                {
                     exceptionMessage = $" [{exceptionMessage}]";
                 }
 
@@ -109,18 +115,24 @@ public abstract class WaitFor
 
     private bool ShouldExceptionRetry(Exception ex, HashSet<bool> allowedSuccessfulInput)
     {
-        if (HandledExceptions.Contains(ex.GetType())) {
+        if (HandledExceptions.Contains(ex.GetType()))
+        {
             Log.Debug($"ShouldExceptionRetry: {ex.GetType().Name} {(ex.InnerException?.Message ?? ex.Message ?? String.Empty)} so {true} must be in {String.Join("|", allowedSuccessfulInput)} to retry");
 
-            if (IsInitialRun && ExitStatusZeroWhen == ExitStatusZeroWhen.FlipFlop) {
+            if (IsInitialRun && ExitStatusZeroWhen == ExitStatusZeroWhen.FlipFlop)
+            {
                 return false;
-            } else {
+            }
+            else
+            {
                 bool shouldRetry = (IsInitialRun && ExitStatusZeroWhen == ExitStatusZeroWhen.FlipFlop) ||
                     allowedSuccessfulInput.Contains(true);
 
                 return shouldRetry;
             }
-        } else {
+        }
+        else
+        {
             throw ex;
         }
     }
@@ -138,9 +150,12 @@ public abstract class WaitFor
     {
         Log.Debug($"ExitStatusIsZero: Outcome: {policyResult.Outcome} ExitStatusZeroWhen: {ExitStatusZeroWhen}: Result: {policyResult.Result} desiredResult: {desiredResult}: HadException: {policyResult.FinalException is not null}");
 
-        if (policyResult.Outcome == OutcomeType.Successful) {
+        if (policyResult.Outcome == OutcomeType.Successful)
+        {
             return desiredResult == policyResult.Result;
-        } else {
+        }
+        else
+        {
             return desiredResult is false && policyResult.FinalException is not null;
         }
     }
